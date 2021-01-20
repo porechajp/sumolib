@@ -1,4 +1,5 @@
 using SumoLib.Config;
+using SumoLib.Query.Services;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,18 +8,19 @@ namespace SumoLib.Query.Impl
 {
     internal class SumoQueryBuilder : ISumoQueryBuilder
     {
-        private readonly EndPointConfig config;
+        private readonly ISumoQueryExecutor executor;
+
         private readonly StringBuilder query;
 
-        public SumoQueryBuilder(EndPointConfig config)
+        public SumoQueryBuilder(ISumoQueryExecutor executor)
         {
-            this.config = config;
+            this.executor = executor;
             this.query = new StringBuilder(256);
         }
 
         public ISumoQuery Build()
         {
-            return new SumoQuery(config, query.ToString());
+            return new SumoQuery(query.ToString(),executor);
         }
 
         public ISumoQueryPipeFragmentBuilder Filter(string filter)
@@ -33,7 +35,7 @@ namespace SumoLib.Query.Impl
             }
             
 
-            return new SumoQueryPipeFragmentBuilder(query,config);
+            return new SumoQueryPipeFragmentBuilder(query,executor);
         }
 
         public ISumoQueryBuilder FromSource(string source)
@@ -46,17 +48,17 @@ namespace SumoLib.Query.Impl
     internal class SumoQueryPipeFragmentBuilder : ISumoQueryPipeFragmentBuilder
     {
         private readonly StringBuilder query;
-        private readonly EndPointConfig config;
+        private readonly ISumoQueryExecutor executor;
 
-        internal SumoQueryPipeFragmentBuilder(StringBuilder query, EndPointConfig config)
+        internal SumoQueryPipeFragmentBuilder(StringBuilder query, ISumoQueryExecutor executor)
         {
             this.query = query;
-            this.config = config;
+            this.executor = executor;
         }
 
         public ISumoQuery Build()
         {
-            return new SumoQuery(config, query.ToString());
+            return new SumoQuery(query.ToString(),executor);
         }
 
         public ISumoQueryPipeFragmentBuilder And(string fragment)
