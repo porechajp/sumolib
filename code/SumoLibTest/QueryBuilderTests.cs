@@ -4,7 +4,7 @@ using SumoLib;
 
 namespace SumoLibTest
 {
-    public class UnitTest1
+    public class QueryBuilderTests
     {
         [Fact]
         public void SimpleQueryBuilderTest()
@@ -47,6 +47,7 @@ namespace SumoLibTest
             .Build().Text;
 
             Assert.Equal(@"(_sourceCategory=env*/webapp OR _sourceCategory=env*/batch) Authentication|parse ""[*:*]"" as uid,fname|fields uid,fname",query);
+
         }
 
 

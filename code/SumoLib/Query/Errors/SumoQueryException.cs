@@ -4,28 +4,21 @@ namespace SumoLib.Errors
     public class SumoQueryException : System.Exception
     {
 
-        public SumoQueryException(SumoQueryErrors code) : base(code.ToString()) { 
-            this.Code= code;
+        public SumoQueryException(string message) : base(message) { 
+            
         }
-        public SumoQueryException(SumoQueryErrors code, System.Exception inner) : base(code.ToString(), inner) {
-
-            this.Code= code;
+        public SumoQueryException(string code, string message) : base($"{code} - {message}") { 
+            this.ErrorCode= code;
+        }
+        public SumoQueryException(string message, System.Exception inner) : base(message, inner) {
+            
          }
         protected SumoQueryException(
             System.Runtime.Serialization.SerializationInfo info,
             System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
 
-        public SumoQueryErrors Code { get;  }
+        public string ErrorCode { get;  }
     }
 
-    public enum SumoQueryErrors
-    {
-        AUTH_FAILED,
-        INVALID_QUERY,
-        RESULTS_TOO_LARGE,
-
-        INVALID_BATCH_ID,
-        TIMEOUT_ON_PAUSED_QUERY
-
-    }
+   
 }

@@ -9,9 +9,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using SumoLib.Config;
-using SumoLib.Query;
+using SumoLib.Errors;
 using SumoLib.Query.Entities;
 using SumoLib.Query.Impl.Common;
+using SumoLib.Query.Services.Transport;
 
 namespace SumoLib.Query.Services.Impl
 {
@@ -30,7 +31,7 @@ namespace SumoLib.Query.Services.Impl
 
         public async Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec querySpec)
         {
-            var client = new HttpClient();
+            var client = HttpClientFactory.NewClient();
             try
             {
 
@@ -41,7 +42,18 @@ namespace SumoLib.Query.Services.Impl
 
                 if (resp.StatusCode != System.Net.HttpStatusCode.Accepted)
                 {
-                    throw new Exception($"Some issue : {resp.StatusCode} Data : {resp.Content.ReadAsStringAsync().Result}");
+                    var respJson = JsonDocument.Parse(await resp.Content.ReadAsStreamAsync());
+
+                    if(respJson.RootElement.TryGetProperty("code", out JsonElement codeElement))
+                    {
+                        throw new SumoQueryException(codeElement.GetString(),respJson.RootElement.GetProperty("message").GetString());
+                    }
+                    else
+                    {
+                        throw new SumoQueryException(respJson.RootElement.GetProperty("message").GetString());
+                    }
+
+                    throw new SumoQueryException($"Response status {(int)resp.StatusCode} - {resp.StatusCode.ToString()}");
                 }
 
                 var searchJobLocation = resp.Headers.Location;
@@ -55,10 +67,14 @@ namespace SumoLib.Query.Services.Impl
 
                 return new ResultEnumerable<T>(client, searchJobLocation, qs);
             }
-            catch(Exception)
+            catch(SumoQueryException)            
+            {
+                throw;
+            }
+            catch(Exception e)
             {
                 client.Dispose();
-                throw;
+                throw new SumoQueryException($"Unhandled error : {e.Message}",e);
             }
              
         }
