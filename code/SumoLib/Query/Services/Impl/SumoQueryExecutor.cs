@@ -39,21 +39,10 @@ namespace SumoLib.Query.Services.Impl
                 client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
                 var resp = await client.PostAsync(searchApiUri, new StringContent(QueryHelpers.BuildRequest(querySpec), Encoding.ASCII, "application/json"));
-
-                if (resp.StatusCode != System.Net.HttpStatusCode.Accepted)
+                
+                if(IsErrorResponse(resp, out SumoQueryException sqe))
                 {
-                    var respJson = JsonDocument.Parse(await resp.Content.ReadAsStreamAsync());
-
-                    if(respJson.RootElement.TryGetProperty("code", out JsonElement codeElement))
-                    {
-                        throw new SumoQueryException(codeElement.GetString(),respJson.RootElement.GetProperty("message").GetString());
-                    }
-                    else
-                    {
-                        throw new SumoQueryException(respJson.RootElement.GetProperty("message").GetString());
-                    }
-
-                    throw new SumoQueryException($"Response status {(int)resp.StatusCode} - {resp.StatusCode.ToString()}");
+                    throw sqe;
                 }
 
                 var searchJobLocation = resp.Headers.Location;
@@ -67,7 +56,7 @@ namespace SumoLib.Query.Services.Impl
 
                 return new ResultEnumerable<T>(client, searchJobLocation, qs);
             }
-            catch(SumoQueryException)            
+            catch (SumoQueryException)            
             {
                 throw;
             }
@@ -79,6 +68,33 @@ namespace SumoLib.Query.Services.Impl
              
         }
 
+        private bool IsErrorResponse(HttpResponseMessage resp, out SumoQueryException sqe)
+        {
+            if (resp.StatusCode == System.Net.HttpStatusCode.Accepted || resp.StatusCode == System.Net.HttpStatusCode.Redirect )
+            {
+                sqe = null;
+                return false;
+            }
+                
+            
+            var respJson = JsonDocument.Parse(resp.Content.ReadAsStringAsync().Result);
+
+            if (respJson.RootElement.TryGetProperty("code", out JsonElement codeElement))
+            {
+                sqe = new SumoQueryException(codeElement.GetString(), respJson.RootElement.GetProperty("message").GetString());                    
+            }
+            else if (respJson.RootElement.TryGetProperty("message", out JsonElement msgElement))
+            {                    
+                sqe= new SumoQueryException(msgElement.GetString());
+            }
+            else
+            {
+                sqe = new SumoQueryException($"Response status {(int)resp.StatusCode} - {resp.StatusCode.ToString()}");
+            }
+            
+            return true;            
+            
+        }
 
         private async Task<QueryStats> WaitForQueryResult(HttpClient client, Uri searchJobLocation)
         {
@@ -90,7 +106,14 @@ namespace SumoLib.Query.Services.Impl
 
                 await Task.Delay(TimeSpan.FromSeconds(1));
 
-                var result = await await client.GetAsync(searchJobLocation).ContinueWith(t => t.Result.Content.ReadAsStringAsync());
+                var resp = await client.GetAsync(searchJobLocation);
+
+                if(IsErrorResponse(resp, out SumoQueryException sqe))
+                {
+                    throw sqe;
+                }
+
+                var result = await resp.Content.ReadAsStringAsync();
 
                 jd = JsonDocument.Parse(result);
 

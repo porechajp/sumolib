@@ -10,10 +10,7 @@ namespace SumoLibTest.TestData
 
         internal const string BadAuthHeaderResponse = @"{""message"":""Full authentication is required to access this resource"",""status"":""401"", ""code"":""unauthorized""}";
 
-        
-
-
-
+        internal const string InvalidJobResponse =  @"{""message"":""Job ID is invalid."",""status"":""404"", ""code"":""jobid.invalid""}";
     }
 
 }

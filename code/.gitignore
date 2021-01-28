@@ -2,3 +2,5 @@ obj
 obj/**
 bin
 bin/**
+.vscode
+.vscode/**

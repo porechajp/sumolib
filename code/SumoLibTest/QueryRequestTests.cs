@@ -81,6 +81,41 @@ namespace SumoLibTest
 
         }
 
+        
+        [Fact]
+        public async void BadRedirectResponse()
+        {
+            var mockHttpHandler = new MockHttpMessageHandler();
+
+            var bldr = SumoClient.New(new SumoLib.Config.EndPointConfig("mock","mock","https://mock.mk/api")).Builder;
+
+
+            var mockRedirectRes = new HttpResponseMessage(HttpStatusCode.Redirect);
+            mockRedirectRes.Headers.Add("Location","https://mock.mk/api/v1/search/jobs/29323");
+            
+            mockHttpHandler.When(HttpMethod.Post, "https://mock.mk/api/v1/search/jobs")
+                            .Respond(req => mockRedirectRes);
+                           //.Respond(HttpStatusCode.Unauthorized,new StringContent("{}")) ;
+
+                           //.WithHeaders("Location","https://mock.mk/api/vi/search/jobs/29323")
+
+            mockHttpHandler.When(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                           .Respond(HttpStatusCode.NotFound,new StringContent(MockedResponses.InvalidJobResponse));
+
+            
+            HttpClientFactory.SetMockClient(mockHttpHandler.ToHttpClient());
+
+            var query = bldr.FromSource("(_sourceCategory=env*/webapp OR _sourceCategory=env*/batch)")
+            .Filter("Authentication")
+            .And("fields uid,fname")
+            .Build();
+
+            var sqe = await Assert.ThrowsAsync<SumoQueryException>(()=>query.ForLast(TimeSpan.FromDays(1)).RunAsync(new { uid="",fname="" }));
+
+            Assert.Equal("jobid.invalid",sqe.ErrorCode);           
+
+        }
+
     }
     
 }
