@@ -70,14 +70,14 @@ namespace SumoLib.Query.Services.Impl
 
         private bool IsErrorResponse(HttpResponseMessage resp, out SumoQueryException sqe)
         {
-            if (resp.StatusCode == System.Net.HttpStatusCode.Accepted || resp.StatusCode == System.Net.HttpStatusCode.Redirect )
+            if (resp.StatusCode == System.Net.HttpStatusCode.OK || resp.StatusCode == System.Net.HttpStatusCode.Accepted || resp.StatusCode == System.Net.HttpStatusCode.Redirect )
             {
                 sqe = null;
                 return false;
             }
-                
-            
-            var respJson = JsonDocument.Parse(resp.Content.ReadAsStringAsync().Result);
+
+            var result = resp.Content.ReadAsStringAsync().Result;
+            var respJson = JsonDocument.Parse(string.IsNullOrEmpty(result) ? "{}":result);
 
             if (respJson.RootElement.TryGetProperty("code", out JsonElement codeElement))
             {
