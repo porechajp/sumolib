@@ -40,7 +40,8 @@ namespace SumoLib.Query.Services.Impl
 
                 var resp = await client.PostAsync(searchApiUri, new StringContent(QueryHelpers.BuildRequest(querySpec), Encoding.ASCII, "application/json"));
                 
-                if(IsErrorResponse(resp, out SumoQueryException sqe))
+                
+                if(resp.IsErrorResponse(out SumoQueryException sqe))
                 {
                     throw sqe;
                 }
@@ -68,34 +69,7 @@ namespace SumoLib.Query.Services.Impl
              
         }
 
-        private bool IsErrorResponse(HttpResponseMessage resp, out SumoQueryException sqe)
-        {
-            if (resp.StatusCode == System.Net.HttpStatusCode.OK || resp.StatusCode == System.Net.HttpStatusCode.Accepted || resp.StatusCode == System.Net.HttpStatusCode.Redirect )
-            {
-                sqe = null;
-                return false;
-            }
-
-            var result = resp.Content.ReadAsStringAsync().Result;
-            var respJson = JsonDocument.Parse(string.IsNullOrEmpty(result) ? "{}":result);
-
-            if (respJson.RootElement.TryGetProperty("code", out JsonElement codeElement))
-            {
-                sqe = new SumoQueryException(codeElement.GetString(), respJson.RootElement.GetProperty("message").GetString());                    
-            }
-            else if (respJson.RootElement.TryGetProperty("message", out JsonElement msgElement))
-            {                    
-                sqe= new SumoQueryException(msgElement.GetString());
-            }
-            else
-            {
-                sqe = new SumoQueryException($"Response status {(int)resp.StatusCode} - {resp.StatusCode.ToString()}");
-            }
-            
-            return true;            
-            
-        }
-
+        
         private async Task<QueryStats> WaitForQueryResult(HttpClient client, Uri searchJobLocation)
         {
             JsonDocument jd = null;
@@ -108,7 +82,7 @@ namespace SumoLib.Query.Services.Impl
 
                 var resp = await client.GetAsync(searchJobLocation);
 
-                if(IsErrorResponse(resp, out SumoQueryException sqe))
+                if(resp.IsErrorResponse(out SumoQueryException sqe))
                 {
                     throw sqe;
                 }
@@ -140,6 +114,7 @@ namespace SumoLib.Query.Services.Impl
     {
         internal static readonly JsonSerializerOptions JSON_OPTS = new JsonSerializerOptions() { PropertyNameCaseInsensitive = true,IgnoreReadOnlyProperties=true, NumberHandling = JsonNumberHandling.AllowReadingFromString };
     }
+
 
 
     internal class ResultEnumerable<T> : IResultEnumerable<T>
@@ -219,18 +194,45 @@ namespace SumoLib.Query.Services.Impl
 
         private IEnumerator<T> RequestNextSetOfData()
         {
-            var limit = pending > 100 ? 100 : pending;
+            try
+            {
+                var limit = pending > 100 ? 100 : pending;
 
-            var result = client.GetAsync(new Uri($"{searchJobLocation}/{dataType}?offset={totalFetched}&limit={limit}"))
-                .ContinueWith(t => t.Result.Content.ReadAsStringAsync());
+                var resp = client
+                    .GetAsync(new Uri($"{searchJobLocation}/{dataType}?offset={totalFetched}&limit={limit}")).Result;
 
-            var jd = JsonDocument.Parse(result.Result.Result);
+                if (resp.IsErrorResponse(out SumoQueryException sqe))
+                {
+                    throw sqe;
+                }
 
-            var messagesElement = jd.RootElement.GetProperty(dataType);// .Single(o => o.Name == "messages");
+                var result = resp.Content.ReadAsStringAsync().Result;
 
-            totalFetched += limit;
+                var jd = JsonDocument.Parse(result);
 
-            return messagesElement.EnumerateArray().Select(je => JsonSerializer.Deserialize<T>(je.GetProperty("map").GetRawText(), JsonOptions.JSON_OPTS)).GetEnumerator();
+                var messagesElement = jd.RootElement.GetProperty(dataType); // .Single(o => o.Name == "messages");
+
+                totalFetched += limit;
+
+                return messagesElement.EnumerateArray().Select(je =>
+                        JsonSerializer.Deserialize<T>(je.GetProperty("map").GetRawText(), JsonOptions.JSON_OPTS))
+                    .GetEnumerator();
+            }
+            catch (SumoQueryException)
+            {
+                client.Dispose();
+                throw;
+            }
+            catch (AggregateException aex)
+            {
+                client.Dispose();
+                throw new SumoQueryException($"Unhandled error : {aex.InnerException.Message}",aex.InnerException);
+            }
+            catch(Exception e)
+            {
+                client.Dispose();
+                throw new SumoQueryException($"Unhandled error : {e.Message}",e);
+            }
         }
 
         private bool IsNextSetOfDataNeeded()

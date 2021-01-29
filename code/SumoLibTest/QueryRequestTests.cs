@@ -280,6 +280,95 @@ namespace SumoLibTest
             
 
         }
+        
+        [Fact]
+        public async void ResultsIterationFailureTest()
+        {
+            var mockHttpHandler = new MockHttpMessageHandler();
+
+            var bldr = SumoClient.New(new SumoLib.Config.EndPointConfig("mock","mock","https://mock.mk/api")).Builder;
+
+            var mockRedirectRes = new HttpResponseMessage(HttpStatusCode.Redirect);
+            mockRedirectRes.Headers.Add("Location","https://mock.mk/api/v1/search/jobs/29323");
+            
+            mockHttpHandler.Expect(HttpMethod.Post, "https://mock.mk/api/v1/search/jobs")
+                .Respond(req => mockRedirectRes);
+
+
+            mockHttpHandler.Expect(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                .Respond(HttpStatusCode.OK, JsonContent.Create(new {state = "NOT STARTED"}));
+            
+            mockHttpHandler.Expect(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                .Respond(HttpStatusCode.OK, JsonContent.Create(new {state = "GATHERING RESULTS"}));
+
+            mockHttpHandler.Expect(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                .Respond(HttpStatusCode.OK, JsonContent.Create(new {state = "DONE GATHERING RESULTS",messageCount=10}));
+
+            mockHttpHandler.Expect(HttpMethod.Get,
+                    "https://mock.mk/api/v1/search/jobs/29323/messages?offset=0&limit=10")
+                .Throw(new IOException("Read Timeout"));
+                //.Respond(HttpStatusCode.OK, JsonContent.Create(new {messages = Enumerable.Range(0,10).Select(i=>new {map=new {uid=i,fname=$"name_{i}"} }) }));
+            
+            HttpClientFactory.SetMockClient(mockHttpHandler.ToHttpClient());
+
+            var query = bldr.FromSource("(_sourceCategory=env*/webapp OR _sourceCategory=env*/batch)")
+                .Filter("Authentication")
+                .And("fields uid,fname")
+                .Build();
+
+            var data = await query.ForLast(TimeSpan.FromDays(1)).RunAsync(new {uid = 0, fname = ""});
+
+            
+            var sqe = Assert.Throws<SumoQueryException>(()=>data.First());
+            Assert.IsType<IOException>(sqe.InnerException);
+            Assert.Equal("Read Timeout",sqe.InnerException.Message);
+
+        }
+
+        [Fact]
+        public async void ResultsIterationServerErrorTest()
+        {
+            var mockHttpHandler = new MockHttpMessageHandler();
+
+            var bldr = SumoClient.New(new SumoLib.Config.EndPointConfig("mock","mock","https://mock.mk/api")).Builder;
+
+            var mockRedirectRes = new HttpResponseMessage(HttpStatusCode.Redirect);
+            mockRedirectRes.Headers.Add("Location","https://mock.mk/api/v1/search/jobs/29323");
+            
+            mockHttpHandler.Expect(HttpMethod.Post, "https://mock.mk/api/v1/search/jobs")
+                .Respond(req => mockRedirectRes);
+
+
+            mockHttpHandler.Expect(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                .Respond(HttpStatusCode.OK, JsonContent.Create(new {state = "NOT STARTED"}));
+            
+            mockHttpHandler.Expect(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                .Respond(HttpStatusCode.OK, JsonContent.Create(new {state = "GATHERING RESULTS"}));
+
+            mockHttpHandler.Expect(HttpMethod.Get, "https://mock.mk/api/v1/search/jobs/29323")
+                .Respond(HttpStatusCode.OK, JsonContent.Create(new {state = "DONE GATHERING RESULTS",messageCount=10}));
+
+            mockHttpHandler.Expect(HttpMethod.Get,
+                    "https://mock.mk/api/v1/search/jobs/29323/messages?offset=0&limit=10")
+                .Respond(HttpStatusCode.InternalServerError);
+                //.Respond(HttpStatusCode.OK, JsonContent.Create(new {messages = Enumerable.Range(0,10).Select(i=>new {map=new {uid=i,fname=$"name_{i}"} }) }));
+            
+            HttpClientFactory.SetMockClient(mockHttpHandler.ToHttpClient());
+
+            var query = bldr.FromSource("(_sourceCategory=env*/webapp OR _sourceCategory=env*/batch)")
+                .Filter("Authentication")
+                .And("fields uid,fname")
+                .Build();
+
+            var data = await query.ForLast(TimeSpan.FromDays(1)).RunAsync(new {uid = 0, fname = ""});
+
+            
+            var sqe = Assert.Throws<SumoQueryException>(()=>data.First());
+            
+            Assert.Equal("Response status 500 - InternalServerError", sqe.Message);
+            
+
+        }
 
     }
     
