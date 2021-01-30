@@ -16,7 +16,7 @@ The API endpoing is protected using Access ID and Access Key, which could be gen
 
 Once you have all three : API URL, Access ID, and Access Key. SumoLib can be configured to use them.,
 
-```
+```csharp
 using SumoLib;
 using SumoLib.Config;
 
@@ -27,9 +27,95 @@ SumoClient.SetupDefault(config);
 
 In case if you don't want to use the same config for entier runtime of your app, you could also pass the config optionally as shown in below examples.
 
+## Querying
+
+If you are impatient, you could directly jump to [Examples](#examples) !
+
+Querying SumoLogic involves three important things,
+
+1. Query
+2. Time Range
+3. Stream of Result Data
+
+The Query must be in the syntax as prescribed Sumologic Query Language. 
+
+### Time Range
+
+Time Range can be specified in relative or absolute terms. The relative time range can be specified as "In Last 5 days", "In Last 5 Months", etc... 
+
+In case of absolute terms, you may provide From and To `DateTime` values.
+
+Please note that Sumologic works best if the times are provided in UTC so in case if you provide `DateTime` with `DateTimeKind.Local` then the library will internally convert the value to UTC using `DateTime.ToUniversalTime()`.
+
+In case if `DateTime.Kind` is `DateTimeKind.Unspecified` then library will just interpret the `DateTime` value provided as UTC.
+
+For example,
+
+if your machine's local timezone is IST (UTC+5:30) then following pair of dates,
+
+```csharp
+DateTime from = new DateTime(2020,12,30,0,0,0,DateTimeKind.Local);
+DateTime to = new DateTime(2020,12,31,0,0,0,DateTimeKind.Local);
+```
+
+would be converted to UTC with effective values of *from* being 29-Dec-2020 18:30:00 and *to* being 30-Dec-2020 18:30:00
+
+However if you have not specified the kind,
+
+```csharp
+DateTime from = new DateTime(2020,12,30,0,0,0);
+DateTime to = new DateTime(2020,12,31,0,0,0);
+```
+The same values will be interpreted as it is. So *from* would be 30-Dec-2020 0:0:0 and *to* would be 31-Dec-2020 0:0:0 
+
+
 ## Examples
 
+Given the default end point config has already been setup, you could execute a simple query following way,
 
+```csharp
+using SumoLib;
 
+var data = await SumoClient.New().Query(@"_sourceCategory=appserver | parse""Login:*"" as uid | fields uid")
+                                 .ForLast(TimeSpan.FromDays(1))
+                                 .RunAsync(new {uid = ""});
 
+Console.WriteLine($"Total Logins : {data.Stats.MessageCount}");
+foreach (var record in data)
+{
+    Console.WriteLine(record.uid);
+}
+
+```
+In case if you have defined entity,
+
+```csharp
+public class LoginData
+{
+    public string Uid { get; set; }
+    public string Source { get; set; }
+}
+
+```
+then you could use the generic RunAsync method,
+
+```csharp
+
+var data = await SumoClient.New().Query(@"_sourceCategory=*/appserver | parse""Login:*"" as uid | _sourceCategory as source | fields uid,source").ForLast(TimeSpan.FromDays(1))
+                               .RunAsync<LoginData>();
+
+Console.WriteLine($"Total Logins : {data.Stats.MessageCount}");
+
+foreach (var record in data)
+{
+    Console.WriteLine($"{record.Uid} logged in {record.Source}");
+}
+ 
+
+```
+It is important to note that library will map fields **case insensitively**. This will nicely bridge the difference between the naming conventions of Sumologic query fields (which are typically camelCase) and C# class properties (typically PascalCase).
+
+So the `uid` field in above example from Sumologic query would be mapped `LoginData.Uid` automatically.
+
+### Query Builder
 
