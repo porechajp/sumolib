@@ -8,7 +8,7 @@ using System.Runtime.CompilerServices;
 
 namespace SumoLib
 {
-    public class SumoClient
+    public static class SumoClient
     {
         
         private static EndPointConfig DefaultConfig { get; set; }
