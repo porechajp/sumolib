@@ -27,7 +27,7 @@ namespace SumoLib.Query.Impl.Common
             }
             else
             {
-                sqe = new SumoQueryException($"Response status {(int)resp.StatusCode} - {resp.StatusCode.ToString()}");
+                sqe = new SumoQueryException($"{(int)resp.StatusCode}",$"{resp.StatusCode.ToString()}");
             }
             
             return true;            
