@@ -62,7 +62,7 @@ namespace SumoLibTest
                 var sqe = await Assert.ThrowsAsync<SumoQueryException>(() =>
                     query.ForLast(TimeSpan.FromDays(1)).RunAsync(new {uid = "", fname = ""}));
 
-                Assert.True(sqe.Message.Contains("Full authentication is required to access this resource"));
+                Assert.Contains("Full authentication is required to access this resource", sqe.Message);
             }
 
         }

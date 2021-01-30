@@ -8,6 +8,8 @@ The APIs are bit tricky and requires stateful communication of three request-res
 
 SumoLib hides all this complexity and provides the `IEnumerable<T>` to process the results using LINQ / loops.
 
+Sumolib is available on Nuget at : https://www.nuget.org/packages/SumoLib/
+
 ## End Point Details
 
 Sumologic provides REST API [endpoints](https://help.sumologic.com/APIs/General-API-Information/Sumo-Logic-Endpoints-and-Firewall-Security) which would be specific to your account, so please contact your account admin for getting the correct API Url. 
@@ -101,8 +103,12 @@ then you could use the generic RunAsync method,
 
 ```csharp
 
-var data = await SumoClient.New().Query(@"_sourceCategory=*/appserver | parse""Login:*"" as uid | _sourceCategory as source | fields uid,source").ForLast(TimeSpan.FromDays(1))
-                               .RunAsync<LoginData>();
+var data = await SumoClient.New().Query(@"_sourceCategory=*/appserver | 
+                                        parse""Login:*"" as uid | 
+                                        _sourceCategory as source 
+                                        | fields uid,source")
+                                 .ForLast(TimeSpan.FromDays(1))
+                                 .RunAsync<LoginData>();
 
 Console.WriteLine($"Total Logins : {data.Stats.MessageCount}");
 
@@ -119,3 +125,59 @@ So the `uid` field in above example from Sumologic query would be mapped `LoginD
 
 ### Query Builder
 
+For the beginners to Sumologic, there is an easier alternative to write Sumologic query in this library using fluent pattern. 
+
+For example,
+
+```csharp
+using SumoLib;
+
+
+var query =  SumoClient.New().Builder
+                .FromSource("(_sourceCategory=env*/webapp OR _sourceCategory=env*/batch)")
+                .Filter("Authentication")
+                .Parse("[*:*]", "uid", "fname")
+                .And("fields uid,fname")
+                .Build()
+   
+// The builder will generate following query
+// (_sourceCategory=env*/webapp OR _sourceCategory=env*/batch) "Authentication" | parse "[*:*]" as uid,fname | fields uid,fname
+
+Console.WriteLine(query.Text);
+
+var data = await query.ForLast(TimeSpan.FromDays(7))
+                      .RunAsync(new {uid = "", fname = ""});
+
+
+```
+
+The builder also has Where function to generate the where clauses easily,
+
+```csharp
+using SumoLib;
+
+
+var query =  SumoClient.New().Builder
+                .FromSource("(_sourceCategory=env*/webapp OR _sourceCategory=env*/batch)")
+                .Filter("Authentication")
+                .Parse("[*:*]", "uid", "fname")
+                .Where("fname").Matches("Robert")
+                .And("fields uid,fname")
+                .Build()
+   
+// The builder will generate following query (searching only user logins whose name Robert)
+// (_sourceCategory=env*/webapp OR _sourceCategory=env*/batch) "Authentication" | parse "[*:*]" as uid,fname | where fname matches "Robert" | fields uid,fname
+
+Console.WriteLine(query.Text);
+
+var data = await query.ForLast(TimeSpan.FromDays(7))
+                      .RunAsync(new {uid = "", fname = ""});
+
+
+```
+
+## Conclusion
+
+Sumolib provides a very idiomatic access to Sumologic search APIs and would help the developers to create innovative applications for monitoring, analytics, troubleshooting, etc... backed by Sumologic's powerful search backend.
+
+Sumolib is available on Nuget at : https://www.nuget.org/packages/SumoLib/
