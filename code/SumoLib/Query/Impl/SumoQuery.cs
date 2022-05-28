@@ -46,14 +46,9 @@ namespace SumoLib.Query.Impl
 
         public ISumoQuery Within(DateTime from, DateTime to)
         {
-            if(from.Kind != DateTimeKind.Utc)
-            {
-                this.from = from.ToUniversalTime();
-            }
-            if (to.Kind != DateTimeKind.Utc)
-            {
-                this.to = to.ToUniversalTime();
-            }
+            this.from = from.Kind != DateTimeKind.Utc ? from.ToUniversalTime() : from;
+            this.to = to.Kind != DateTimeKind.Utc ? to.ToUniversalTime() : to;
+            
             return this;
         }
 
