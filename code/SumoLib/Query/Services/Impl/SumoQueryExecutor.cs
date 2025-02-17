@@ -27,9 +27,8 @@ namespace SumoLib.Query.Services.Impl
             this.AuthHeader = Convert.ToBase64String(ASCIIEncoding.ASCII.GetBytes($"{config.AccessId}:{config.AccessKey}"));
         }
 
-
-
-        public async Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec querySpec)
+        
+        private async Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec querySpec, IEnumerable<string> fields)
         {
             var client = HttpClientFactory.NewClient();
             try
@@ -50,12 +49,12 @@ namespace SumoLib.Query.Services.Impl
 
                 var cookies = String.Join(";", resp.Headers.Where(h => h.Key.Equals("Set-Cookie", StringComparison.OrdinalIgnoreCase)).SelectMany(h => h.Value));
 
-
+ 
                 client.DefaultRequestHeaders.Add("cookie", cookies);
 
                 var qs = await WaitForQueryResult(client, searchJobLocation);
 
-                return new ResultEnumerable<T>(client, searchJobLocation, qs);
+                return new ResultEnumerable<T>(client, searchJobLocation, qs, fields);
             }
             catch (SumoQueryException)            
             {
@@ -69,7 +68,21 @@ namespace SumoLib.Query.Services.Impl
              
         }
 
-        
+        public Task<IResultEnumerable<object[]>> RunAsync(QuerySpec spec, IEnumerable<string> fields)
+        {
+            if(fields==null || !fields.Any())
+            {
+                throw new ArgumentNullException("fields");
+            }
+
+            return this.RunAsync<Object[]>(spec, fields);
+        }
+
+        public Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec spec)
+        {
+            return this.RunAsync<T>(spec, Enumerable.Empty<string>());
+        }
+
         private async Task<QueryStats> WaitForQueryResult(HttpClient client, Uri searchJobLocation)
         {
             JsonDocument jd = null;
@@ -123,9 +136,9 @@ namespace SumoLib.Query.Services.Impl
 
         public QueryStats Stats { get; }
 
-        internal ResultEnumerable(HttpClient client, Uri searchJobLocation, QueryStats qs)
+        internal ResultEnumerable(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields)
         {
-            this.enumerator = new ResultEnumerator<T>(client, searchJobLocation, qs);
+            this.enumerator = new ResultEnumerator<T>(client, searchJobLocation, qs, fields);
             this.Stats = qs;
         }
             
@@ -150,13 +163,14 @@ namespace SumoLib.Query.Services.Impl
         private readonly string dataType;
         private int totalFetched;
         private int pending;
+        private List<string> fields;
         private IEnumerator<T> internalEnum;
 
-        public ResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs)
+        public ResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields)
         {
             this.client = client;
             this.searchJobLocation = searchJobLocation;
-            
+            this.fields = fields.ToList();
 
             this.totalRecords = qs.RecordCount > 0 ? qs.RecordCount : qs.MessageCount;
 
@@ -208,15 +222,23 @@ namespace SumoLib.Query.Services.Impl
 
                 var result = resp.Content.ReadAsStringAsync().Result;
 
-                var jd = JsonDocument.Parse(result);
-
+                var jd = JsonDocument.Parse(result);                
                 var messagesElement = jd.RootElement.GetProperty(dataType); // .Single(o => o.Name == "messages");
 
                 totalFetched += limit;
 
-                return messagesElement.EnumerateArray().Select(je =>
+                //forking functionality between generic type and object[]
+                if (this.fields.Any())
+                {
+
+                    return ResponseDataFormatting(messagesElement);
+                }
+                else
+                {
+                    return messagesElement.EnumerateArray().Select(je =>
                         JsonSerializer.Deserialize<T>(je.GetProperty("map").GetRawText(), JsonOptions.JSON_OPTS))
-                    .GetEnumerator();
+                    .GetEnumerator();             
+                }
             }
             catch (SumoQueryException)
             {
@@ -233,6 +255,49 @@ namespace SumoLib.Query.Services.Impl
                 client.Dispose();
                 throw new SumoQueryException($"Unhandled error : {e.Message}",e);
             }
+        }
+
+        //filtering only the necessary fields
+        private IEnumerator<T> ResponseDataFormatting(JsonElement messages)
+        {
+            foreach (var message in messages.EnumerateArray())
+            {
+                var map = message.GetProperty("map");
+
+                var row = new object[this.fields.Count() + 1];
+
+                row[0] = map.TryGetProperty("_messagetime", out JsonElement timeValue) &&                             
+                              (timeValue.ValueKind == JsonValueKind.String && long.TryParse(timeValue.GetString(), out long unixMillis))
+                             ? DateTimeOffset.FromUnixTimeMilliseconds(unixMillis).UtcDateTime
+                             : DateTime.UtcNow;
+
+                for (int i = 0; i < this.fields.Count(); i++)
+                {
+                    string propName = this.fields[i];
+                    row[i + 1] = map.TryGetProperty(propName, out JsonElement value)
+                        ? ConvertField(value)
+                        : null;
+                }
+
+                yield return (T)(Object)row;
+            }
+        }
+
+        // converting JsonValueKind types to string
+        private object ConvertField(JsonElement value)
+        {
+            if (value.ValueKind == JsonValueKind.Null || value.ValueKind == JsonValueKind.Undefined)
+                return null;
+
+            string stringValue = value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString(),
+                JsonValueKind.Number => value.ToString(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false"
+            };
+
+            return stringValue;
         }
 
         private bool IsNextSetOfDataNeeded()

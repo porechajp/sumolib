@@ -45,7 +45,9 @@ namespace SumoLib.Query
 
         Task<IResultEnumerable<T>> RunAsync<T>();
 
-        Task<IResultEnumerable<T>> RunAsync<T>(T anonymous); 
+        Task<IResultEnumerable<T>> RunAsync<T>(T anonymous);
+
+        Task<IResultEnumerable<Object[]>> RunAsync(IEnumerable<string> fields);         
 
     }
 

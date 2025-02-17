@@ -61,7 +61,10 @@ namespace SumoLib.Query.Impl
         {
             return await executor.RunAsync<T>(new QuerySpec(query,from,to));
         }
-
-
+        // Run async method that takes a list of fields required in response and reurns an object[] enumerable
+        public async Task<IResultEnumerable<Object[]>> RunAsync(IEnumerable<string> fields)
+        {
+            return await executor.RunAsync(new QuerySpec(query, from, to), fields);
+        }        
     }
 }

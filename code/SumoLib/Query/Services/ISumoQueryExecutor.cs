@@ -7,6 +7,7 @@ namespace SumoLib.Query.Services
 {
     internal interface ISumoQueryExecutor
     {
+        Task<IResultEnumerable<Object[]>> RunAsync(QuerySpec spec, IEnumerable<string> fields);
         Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec spec);
     }
 
