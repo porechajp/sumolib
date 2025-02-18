@@ -163,7 +163,7 @@ namespace SumoLib.Query.Services.Impl
         private readonly string dataType;
         private int totalFetched;
         private int pending;
-        private IEnumerable<string> fields;
+        private readonly IEnumerable<string> fields;
         private IEnumerator<T> internalEnum;
 
         public ResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields)
@@ -264,14 +264,15 @@ namespace SumoLib.Query.Services.Impl
             {
                 var map = message.GetProperty("map");
 
-                var row = new object[this.fields.Count() + 1];
+                var fieldsCount = this.fields.Count();
+                var row = new object[fieldsCount + 1];
 
                 row[0] = map.TryGetProperty("_messagetime", out JsonElement timeValue) &&                             
                               (timeValue.ValueKind == JsonValueKind.String && long.TryParse(timeValue.GetString(), out long unixMillis))
                              ? DateTimeOffset.FromUnixTimeMilliseconds(unixMillis).UtcDateTime
                              : DateTime.UtcNow;
 
-                for (int i = 0; i < this.fields.Count(); i++)
+                for (int i = 0; i < fieldsCount; i++)
                 {
                     string propName = this.fields.ElementAt(i);
                     row[i + 1] = map.TryGetProperty(propName, out JsonElement value)
