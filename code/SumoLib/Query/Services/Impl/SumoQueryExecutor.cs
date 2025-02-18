@@ -72,7 +72,7 @@ namespace SumoLib.Query.Services.Impl
         {
             if(fields==null || !fields.Any())
             {
-                throw new ArgumentNullException("fields");
+                throw new ArgumentNullException("fields", "fields cannot be null or empty");
             }
 
             return this.RunAsync<Object[]>(spec, fields);
@@ -163,14 +163,14 @@ namespace SumoLib.Query.Services.Impl
         private readonly string dataType;
         private int totalFetched;
         private int pending;
-        private List<string> fields;
+        private IEnumerable<string> fields;
         private IEnumerator<T> internalEnum;
 
         public ResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields)
         {
             this.client = client;
             this.searchJobLocation = searchJobLocation;
-            this.fields = fields.ToList();
+            this.fields = fields;
 
             this.totalRecords = qs.RecordCount > 0 ? qs.RecordCount : qs.MessageCount;
 
@@ -273,7 +273,7 @@ namespace SumoLib.Query.Services.Impl
 
                 for (int i = 0; i < this.fields.Count(); i++)
                 {
-                    string propName = this.fields[i];
+                    string propName = this.fields.ElementAt(i);
                     row[i + 1] = map.TryGetProperty(propName, out JsonElement value)
                         ? ConvertField(value)
                         : null;
