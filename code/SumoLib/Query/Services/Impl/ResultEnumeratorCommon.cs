@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using SumoLib.Query.Impl.Common;
+using System.Threading;
 
 
 namespace SumoLib.Query.Services.Impl
@@ -18,12 +19,13 @@ namespace SumoLib.Query.Services.Impl
         private readonly string dataType;
         private int pending;
         private int totalFetched;
+        private readonly CancellationToken _cancellationToken;
 
-        protected ResultEnumeratorCommon(HttpClient client, Uri searchJobLocation, QueryStats qs)
+        protected ResultEnumeratorCommon(HttpClient client, Uri searchJobLocation, QueryStats qs, CancellationToken cancellationToken)
         {
             this.client = client;
             this.searchJobLocation = searchJobLocation;
-
+            this._cancellationToken = cancellationToken;
             this.totalRecords = qs.RecordCount > 0 ? qs.RecordCount : qs.MessageCount;
 
             this.dataType = qs.RecordCount > 0 ? "records" : "messages";
@@ -38,7 +40,7 @@ namespace SumoLib.Query.Services.Impl
                 var limit = this.pending > 100 ? 100 : this.pending;
 
                 var resp = client
-                    .GetAsync(new Uri($"{searchJobLocation}/{dataType}?offset={this.totalFetched}&limit={limit}")).Result;
+                    .GetAsync(new Uri($"{searchJobLocation}/{dataType}?offset={this.totalFetched}&limit={limit}"), _cancellationToken).Result;
 
                 if (resp.IsErrorResponse(out SumoQueryException sqe))
                 {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SumoLib.Query
@@ -43,11 +44,11 @@ namespace SumoLib.Query
 
         ISumoQuery Within(DateTime from, DateTime to);
 
-        Task<IResultEnumerable<T>> RunAsync<T>();
+        Task<IResultEnumerable<T>> RunAsync<T>(CancellationToken cancellationToken=default);
 
-        Task<IResultEnumerable<T>> RunAsync<T>(T anonymous);
+        Task<IResultEnumerable<T>> RunAsync<T>(T anonymous, CancellationToken cancellationToken = default);
 
-        Task<IResultEnumerable<Object[]>> RunAsync(IEnumerable<string> fields);         
+        Task<IResultEnumerable<Object[]>> RunAsync(IEnumerable<string> fields, CancellationToken cancellationToken = default);         
 
     }
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace SumoLib.Query.Services.Impl
 {
@@ -16,9 +17,9 @@ namespace SumoLib.Query.Services.Impl
 
         public QueryStats Stats { get; }
 
-        internal FieldsResultEnumerable(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields)
+        internal FieldsResultEnumerable(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields, CancellationToken cancellationToken)
         {
-            this.enumerator = new FieldResultEnumerator(client, searchJobLocation, qs, fields);
+            this.enumerator = new FieldResultEnumerator(client, searchJobLocation, qs, fields, cancellationToken);
             this.Stats = qs;
         }
 
@@ -41,7 +42,7 @@ namespace SumoLib.Query.Services.Impl
 
         private IEnumerator<object[]> internalEnum;
 
-        public FieldResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields) : base(client, searchJobLocation, qs)
+        public FieldResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs, IEnumerable<string> fields, CancellationToken cancellationToken) : base(client, searchJobLocation, qs, cancellationToken)
         {
             this.fields = fields;
         }
@@ -90,8 +91,8 @@ namespace SumoLib.Query.Services.Impl
 
                 row[0] = map.TryGetProperty("_messagetime", out JsonElement timeValue) &&
                               (timeValue.ValueKind == JsonValueKind.String && long.TryParse(timeValue.GetString(), out long unixMillis))
-                             ? DateTimeOffset.FromUnixTimeMilliseconds(unixMillis).UtcDateTime
-                             : DateTime.UtcNow;
+                             ? unixMillis
+                             : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
                 for (int i = 0; i < fieldsCount; i++)
                 {
