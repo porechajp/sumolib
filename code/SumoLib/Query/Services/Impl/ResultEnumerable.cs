@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 
 namespace SumoLib.Query.Services.Impl
 {
@@ -18,9 +19,9 @@ namespace SumoLib.Query.Services.Impl
 
         public QueryStats Stats { get; }
 
-        internal ResultEnumerable(HttpClient client, Uri searchJobLocation, QueryStats qs)
+        internal ResultEnumerable(HttpClient client, Uri searchJobLocation, QueryStats qs, CancellationToken cancellationToken)
         {
-            this.enumerator = new ResultEnumerator<T>(client, searchJobLocation, qs);
+            this.enumerator = new ResultEnumerator<T>(client, searchJobLocation, qs, cancellationToken);
             this.Stats = qs;
         }
 
@@ -43,7 +44,7 @@ namespace SumoLib.Query.Services.Impl
     {
         private IEnumerator<T> internalEnum;
 
-        public ResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs):base(client,searchJobLocation,qs)
+        public ResultEnumerator(HttpClient client, Uri searchJobLocation, QueryStats qs, CancellationToken cancellationToken) :base(client,searchJobLocation,qs,cancellationToken)
         {
         }
 

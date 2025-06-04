@@ -52,19 +52,19 @@ namespace SumoLib.Query.Impl
             return this;
         }
 
-        public async Task<IResultEnumerable<T>> RunAsync<T>(T anonymous)
+        public async Task<IResultEnumerable<T>> RunAsync<T>(T anonymous, CancellationToken cancellationToken = default)
         {
-            return await RunAsync<T>();
+            return await RunAsync<T>(cancellationToken);
         }
 
-        public async Task<IResultEnumerable<T>> RunAsync<T>()
+        public async Task<IResultEnumerable<T>> RunAsync<T>(CancellationToken cancellationToken = default)
         {
-            return await executor.RunAsync<T>(new QuerySpec(query,from,to));
+            return await executor.RunAsync<T>(new QuerySpec(query,from,to), cancellationToken);
         }
         // Run async method that takes a list of fields required in response and reurns an object[] enumerable
-        public async Task<IResultEnumerable<Object[]>> RunAsync(IEnumerable<string> fields)
+        public async Task<IResultEnumerable<Object[]>> RunAsync(IEnumerable<string> fields, CancellationToken cancellationToken = default)
         {
-            return await executor.RunAsync(new QuerySpec(query, from, to), fields);
+            return await executor.RunAsync(new QuerySpec(query, from, to), fields, cancellationToken);
         }        
     }
 }
