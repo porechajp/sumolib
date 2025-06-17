@@ -66,7 +66,7 @@ namespace SumoLib.Query.Services.Impl
         private async Task<IResultEnumerable<object[]>> RunAsyncInternal(QuerySpec querySpec, IEnumerable<string> fields)
         {
 
-            SumoRequest? sumoRequest = null;
+            SumoRequest sumoRequest = null;
             try
             {
                 sumoRequest = await InitiateSumoQueryRequest(querySpec);

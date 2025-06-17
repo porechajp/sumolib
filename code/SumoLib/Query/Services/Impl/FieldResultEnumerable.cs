@@ -116,7 +116,8 @@ namespace SumoLib.Query.Services.Impl
                 JsonValueKind.String => value.GetString(),
                 JsonValueKind.Number => value.ToString(),
                 JsonValueKind.True => "true",
-                JsonValueKind.False => "false"
+                JsonValueKind.False => "false",
+                _ => value.ToString(),
             };
 
             return stringValue;
