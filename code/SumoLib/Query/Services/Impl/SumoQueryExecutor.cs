@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 using SumoLib.Config;
 using SumoLib.Errors;
@@ -28,7 +29,7 @@ namespace SumoLib.Query.Services.Impl
         }
 
 
-        private async Task<SumoRequest> InitiateSumoQueryRequest(QuerySpec querySpec)
+        private async Task<SumoRequest> InitiateSumoQueryRequest(QuerySpec querySpec, CancellationToken cancellationToken)
         {
             var sumoRequest = new SumoRequest();
 
@@ -56,21 +57,21 @@ namespace SumoLib.Query.Services.Impl
 
             client.DefaultRequestHeaders.Add("cookie", cookies);
 
-            var qs = await WaitForQueryResult(client, searchJobLocation);
+            var qs = await WaitForQueryResult(client, searchJobLocation, cancellationToken);
 
             sumoRequest.QuerySts = qs;
 
             return sumoRequest;
         }
 
-        private async Task<IResultEnumerable<object[]>> RunAsyncInternal(QuerySpec querySpec, IEnumerable<string> fields)
+        private async Task<IResultEnumerable<object[]>> RunAsyncInternal(QuerySpec querySpec, IEnumerable<string> fields, CancellationToken cancellationToken)
         {
 
             SumoRequest sumoRequest = null;
             try
             {
-                sumoRequest = await InitiateSumoQueryRequest(querySpec);
-                return new FieldsResultEnumerable(sumoRequest.Client, sumoRequest.SearchJobLocation, sumoRequest.QuerySts, fields);
+                sumoRequest = await InitiateSumoQueryRequest(querySpec, cancellationToken);
+                return new FieldsResultEnumerable(sumoRequest.Client, sumoRequest.SearchJobLocation, sumoRequest.QuerySts, fields, cancellationToken);
             }
             catch (SumoQueryException)
             {
@@ -87,14 +88,14 @@ namespace SumoLib.Query.Services.Impl
         }
 
 
-        private async Task<IResultEnumerable<T>> RunAsyncInternal<T>(QuerySpec querySpec)
+        private async Task<IResultEnumerable<T>> RunAsyncInternal<T>(QuerySpec querySpec, CancellationToken cancellationToken)
         {
 
             SumoRequest? sumoRequest=null;
             try
             {
-                sumoRequest = await InitiateSumoQueryRequest(querySpec);
-                return new ResultEnumerable<T>(sumoRequest.Client, sumoRequest.SearchJobLocation, sumoRequest.QuerySts);
+                sumoRequest = await InitiateSumoQueryRequest(querySpec, cancellationToken);
+                return new ResultEnumerable<T>(sumoRequest.Client, sumoRequest.SearchJobLocation, sumoRequest.QuerySts, cancellationToken);
             }
             catch (SumoQueryException)            
             {
@@ -110,28 +111,28 @@ namespace SumoLib.Query.Services.Impl
              
         }
 
-        public Task<IResultEnumerable<object[]>> RunAsync(QuerySpec spec, IEnumerable<string> fields)
+        public Task<IResultEnumerable<object[]>> RunAsync(QuerySpec spec, IEnumerable<string> fields, CancellationToken cancellationToken)
         {
             if(fields==null || !fields.Any())
             {
                 throw new ArgumentNullException("fields", "fields cannot be null or empty");
             }
 
-            return this.RunAsyncInternal(spec, fields);
+            return this.RunAsyncInternal(spec, fields, cancellationToken);
         }
 
-        public Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec spec)
+        public Task<IResultEnumerable<T>> RunAsync<T>(QuerySpec spec, CancellationToken cancellationToken)
         {
-            return this.RunAsyncInternal<T>(spec);
+            return this.RunAsyncInternal<T>(spec, cancellationToken);
         }
 
-        private async Task<QueryStats> WaitForQueryResult(HttpClient client, Uri searchJobLocation)
+        private async Task<QueryStats> WaitForQueryResult(HttpClient client, Uri searchJobLocation, CancellationToken cancellationToken)
         {
             JsonDocument jd = null;
             string resultCode = null;
             do
             {
-
+                cancellationToken.ThrowIfCancellationRequested();
 
                 await Task.Delay(TimeSpan.FromSeconds(1));
 
